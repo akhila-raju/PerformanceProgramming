@@ -186,13 +186,18 @@ conv_layer_t* make_conv_layer(int in_sx, int in_sy, int in_depth,
 
 void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
   uint64_t start_time = timestamp_us();
+
+  int xy_stride = l->stride;
+
   for (int i = start; i <= end; i++) {
     vol_t* V = in[i];
     vol_t* A = out[i];
-        
+
     int V_sx = V->sx;
     int V_sy = V->sy;
-    int xy_stride = l->stride;
+
+
+    
   
     for(int d = 0; d < l->out_depth; d++) {
       vol_t* f = l->filters[d];
@@ -208,6 +213,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
               int ox = x + fx;
               if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
                 for(int fd=0;fd < f->depth; fd++) {
+                  printf("The depth: %" PRId64 "\n", f->depth);
                   a += f->w[((f->sx * fy)+fx)*f->depth+fd] * V->w[((V_sx * oy)+ox)*V->depth+fd];
                 }
               }
