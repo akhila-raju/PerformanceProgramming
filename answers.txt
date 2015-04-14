@@ -25,11 +25,11 @@ smallest fraction: softmax
 
 QUESTION 3:
 
-conv: <speedup> x
-relu: <speedup> x
-pool: <speedup> x
-fc: <speedup> x
-softmax: <speedup> x
+conv: 3.775x
+relu: 1.0035x
+pool: 1.00958x
+fc: 1.000507x
+softmax: 1.000062x
 
 Which layer should we optimize?
 
