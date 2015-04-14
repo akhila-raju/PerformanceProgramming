@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <string.h>
+#include <inttypes.h>
 
 // Include SSE intrinsics
 #if defined(_MSC_VER)
@@ -184,6 +185,7 @@ conv_layer_t* make_conv_layer(int in_sx, int in_sy, int in_depth,
 }
 
 void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
+  uint64_t start_time = timestamp_us();
   for (int i = start; i <= end; i++) {
     vol_t* V = in[i];
     vol_t* A = out[i];
@@ -647,18 +649,76 @@ void free_batch(batch_t* v, int size) {
  * to process (start and end are inclusive).
  */
 
+uint64_t conv_l1_time = 0;
+uint64_t relu_l1_time = 0;
+uint64_t pool_l1_time = 0;
+uint64_t conv_l2_time = 0;
+uint64_t relu_l2_time = 0;
+uint64_t pool_l2_time = 0;
+uint64_t conv_l3_time = 0;
+uint64_t relu_l3_time = 0;
+uint64_t pool_l3_time = 0;
+uint64_t fc_time = 0;
+uint64_t softmax_time = 0;
+
 void net_forward(network_t* net, batch_t* v, int start, int end) {
+  uint64_t end_time;
+  uint64_t start_time;
+  
+  start_time = timestamp_us();
   conv_forward(net->l0, v[0], v[1], start, end);
+  end_time = timestamp_us();
+  conv_l1_time += end_time - start_time;
+
+  start_time = timestamp_us();
   relu_forward(net->l1, v[1], v[2], start, end);
+  end_time = timestamp_us();
+  relu_l1_time += end_time - start_time;
+
+  start_time = timestamp_us();
   pool_forward(net->l2, v[2], v[3], start, end);
+  end_time = timestamp_us();
+  pool_l1_time += end_time - start_time;
+  
+  start_time = timestamp_us();
   conv_forward(net->l3, v[3], v[4], start, end);
+  end_time = timestamp_us();
+  conv_l2_time += end_time - start_time;
+
+  start_time = timestamp_us();
   relu_forward(net->l4, v[4], v[5], start, end);
+  end_time = timestamp_us();
+  relu_l2_time += end_time - start_time;
+
+  start_time = timestamp_us();
   pool_forward(net->l5, v[5], v[6], start, end);
+  end_time = timestamp_us();
+  pool_l2_time += end_time - start_time;
+
+  start_time = timestamp_us();
   conv_forward(net->l6, v[6], v[7], start, end);
+  end_time = timestamp_us();
+  conv_l3_time += end_time - start_time;
+
+  start_time = timestamp_us();
   relu_forward(net->l7, v[7], v[8], start, end);
+  end_time = timestamp_us();
+  relu_l3_time += end_time - start_time;
+
+  start_time = timestamp_us();
   pool_forward(net->l8, v[8], v[9], start, end);
+  end_time = timestamp_us();
+  pool_l3_time += end_time - start_time;
+
+  start_time = timestamp_us();
   fc_forward(net->l9, v[9], v[10], start, end);
+  end_time = timestamp_us();
+  fc_time += end_time - start_time;
+
+  start_time = timestamp_us();
   softmax_forward(net->l10, v[10], v[11], start, end);
+  end_time = timestamp_us();
+  softmax_time += end_time - start_time;
 }
 
 /*
@@ -679,6 +739,38 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
     net_forward(net, batch, 0, 0);
     output[i] = batch[11][0]->w[CAT_LABEL]; 
   }
+
+  uint64_t total_runtime = conv_l1_time + relu_l1_time + pool_l1_time 
+    + conv_l2_time + relu_l2_time + pool_l2_time + conv_l3_time + relu_l3_time 
+    + pool_l3_time + fc_time + softmax_time;
+
+  printf("TOTAL TIME:%" PRId64 "\n", total_runtime);
+  printf("THE TIME IN CONV LEVEL 1 IS:%" PRId64 "\n", conv_l1_time);
+  printf("THE PERCENT IN CONV LEVEL 1 IS:%f\n", (float) 100*conv_l1_time/total_runtime);
+  printf("THE TIME IN RELU LEVEL 2 IS:%" PRId64 "\n", relu_l1_time);
+  printf("THE PERCENT IN RELU LEVEL 2 IS:%f\n", (float) 100*relu_l1_time/total_runtime);
+  printf("THE TIME IN POOL LEVEL 3 IS:%" PRId64 "\n", pool_l1_time);
+  printf("THE PERCENT IN POOL LEVEL 3 IS:%f\n", (float) 100*pool_l1_time/total_runtime);
+
+  printf("THE TIME IN CONV LEVEL 4 IS:%" PRId64 "\n", conv_l2_time);
+  printf("THE PERCENT IN CONV LEVEL 4 IS:%f\n", (float) 100*conv_l2_time/total_runtime);
+  printf("THE TIME IN RELU LEVEL 5 IS:%" PRId64 "\n", relu_l2_time);
+  printf("THE PERCENT IN RELU LEVEL 5 IS:%f\n", (float) 100*relu_l2_time/total_runtime);
+  printf("THE TIME IN POOL LEVEL 6 IS:%" PRId64 "\n", pool_l2_time);
+  printf("THE PERCENT IN POOL LEVEL 6 IS:%f\n\n", (float) 100*pool_l2_time/total_runtime);
+
+  printf("THE TIME IN CONV LEVEL 7 IS:%" PRId64 "\n", conv_l3_time);
+  printf("THE PERCENT IN CONV LEVEL 7 IS:%f\n", (float) 100*conv_l3_time/total_runtime);
+  printf("THE TIME IN RELU LEVEL 8 IS:%" PRId64 "\n", relu_l3_time);
+  printf("THE PERCENT IN RELU LEVEL 8 IS:%f\n", (float) 100*relu_l3_time/total_runtime);
+  printf("THE TIME IN POOL LEVEL 9 IS:%" PRId64 "\n", pool_l3_time);
+  printf("THE PERCENT IN POOL LEVEL 9 IS:%f\n\n", (float) 100*pool_l3_time/total_runtime);
+
+
+  printf("THE TIME IN FC LEVEL 10 IS:%" PRId64 "\n", fc_time);
+  printf("THE PERCENT IN FC LEVEL 10 IS:%f\n", (float) 100*fc_time/total_runtime);
+  printf("THE TIME IN SOFTMAX LEVEL 11 IS:%" PRId64 "\n", softmax_time);
+  printf("THE PERCENT IN SOFTMAX LEVEL 11 IS:%f\n", (float) 100*softmax_time/total_runtime);
 
   free_batch(batch, 1);
 }

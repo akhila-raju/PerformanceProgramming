@@ -1,16 +1,16 @@
 QUESTION 1:
 
-LAYER 0 (conv)     : <t> ms / <p> %
-LAYER 1 (relu)     : <t> ms / <p> %
-LAYER 2 (pool)     : <t> ms / <p> %
-LAYER 3 (conv)     : <t> ms / <p> %
-LAYER 4 (relu)     : <t> ms / <p> %
-LAYER 5 (pool)     : <t> ms / <p> %
-LAYER 6 (conv)     : <t> ms / <p> %
-LAYER 7 (relu)     : <t> ms / <p> %
-LAYER 8 (pool)     : <t> ms / <p> %
-LAYER 9 (fc)       : <t> ms / <p> %
-LAYER 10 (softmax) : <t> ms / <p> %
+LAYER 0 (conv)     : 288488 ms / <p> %
+LAYER 1 (relu)     : 2174 ms / <p> %
+LAYER 2 (pool)     : 6215 ms / <p> %
+LAYER 3 (conv)     : 283589 ms / <p> %
+LAYER 4 (relu)     : 1387 ms / <p> %
+LAYER 5 (pool)     : 1877 ms / <p> %
+LAYER 6 (conv)     : 76924 ms / <p> %
+LAYER 7 (relu)     : 80 ms / <p> %
+LAYER 8 (pool)     : 467 ms / <p> %
+LAYER 9 (fc)       : 387 ms / <p> %
+LAYER 10 (softmax) : 125 ms / <p> %
 
 QUESTION 2:
 
