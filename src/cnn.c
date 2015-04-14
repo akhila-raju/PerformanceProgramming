@@ -740,9 +740,9 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
     output[i] = batch[11][0]->w[CAT_LABEL]; 
   }
 
-  uint64_t total_runtime = conv_l1_time + relu_l1_time + pool_l1_time 
+  uint64_t total_runtime = (conv_l1_time + relu_l1_time + pool_l1_time 
     + conv_l2_time + relu_l2_time + pool_l2_time + conv_l3_time + relu_l3_time 
-    + pool_l3_time + fc_time + softmax_time;
+    + pool_l3_time + fc_time + softmax_time);
 
   printf("TOTAL TIME:%" PRId64 "\n", total_runtime);
   printf("THE TIME IN CONV LEVEL 1 IS:%" PRId64 "\n", conv_l1_time);
