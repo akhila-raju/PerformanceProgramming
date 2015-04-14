@@ -215,26 +215,110 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
               
               if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
 
-                for (int i = f->depth / 4 * 4; i < f->depth; i++) {
-                  a += f->w[((f->sx * fy)+fx)*f->depth+i] * V->w[((V_sx * oy)+ox)*V->depth+i];
-                }
-                
-                // for(int fd= 0;fd < f->depth; fd++) {
-                for (int fd = 0; fd < f->depth / 4 * 4; fd += 4) {
-                  a += f->w[((f->sx * fy)+fx)*f->depth+fd] * V->w[((V_sx * oy)+ox)*V->depth+fd];
-                  a += f->w[((f->sx * fy)+fx)*f->depth+fd+1] * V->w[((V_sx * oy)+ox)*V->depth+fd+1];
-                  a += f->w[((f->sx * fy)+fx)*f->depth+fd+2] * V->w[((V_sx * oy)+ox)*V->depth+fd+2];
-                  a += f->w[((f->sx * fy)+fx)*f->depth+fd+3] * V->w[((V_sx * oy)+ox)*V->depth+fd+3];
+                int val;              
+                for (int i = f->depth / 16 * 16; i < f->depth; i++) {
+                  val += f->w[((f->sx * fy)+fx)*f->depth+i] * V->w[((V_sx * oy)+ox)*V->depth+i];
                 }
 
 
+                __m256i sum = _mm_setzero_si256();
+                __m256i v_vector = _mm_setzero_si256();   // v vector = zero
+                __m256i f_vector = _mm_setzero_si256();  // f vector = zero
+                __m256i f_times_v = _mm_setzero_si256();  // f_times_v vector = zero
+
+                for (int fd = 0; fd < f->depth / 16 * 16; fd += 16) {
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+1])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+1])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+2])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+2])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+3])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+3])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+4])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+4])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+5])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+5])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+6])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+6])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+7])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+7])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+8])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+8])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+9])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+9])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+10])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+10])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+11])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+11])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+12])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+12])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+13])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+13])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+14])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+14])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+
+                  v_vector = _mm_loadu_si256((__m256i*) (V->w[((V_sx * oy)+ox)*V->depth+fd+15])); // load v vector
+                  f_vector = _mm_loadu_si256((__m256i*) (f->w[((f->sx * fy)+fx)*f->depth+fd+15])); // load f vector
+                  f_times_v = (__m256) _mm_mul_ps(f_vector, v_vector); // multiply f vector and v vector
+                  _mm_add_epi32(sum, f_times_v); // add vectors
+                }
+
+                int newsum[4];
+                _mm_storeu_si256((__m256i*) newsum, a);
+                val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
 
 
               }
             }
           }
           a += l->biases->w[d];
-          set_vol(A, ax, ay, d, a);
+          set_vol(A, ax, ay, d, val); //replaced a with val
         }
       }
     }
