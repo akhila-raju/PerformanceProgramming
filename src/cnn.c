@@ -660,6 +660,10 @@ uint64_t relu_l3_time = 0;
 uint64_t pool_l3_time = 0;
 uint64_t fc_time = 0;
 uint64_t softmax_time = 0;
+uint64_t total_conv_time = 0;
+uint64_t total_relu_time = 0;
+uint64_t total_pool_time = 0;
+
 
 void net_forward(network_t* net, batch_t* v, int start, int end) {
   uint64_t end_time;
@@ -719,6 +723,10 @@ void net_forward(network_t* net, batch_t* v, int start, int end) {
   softmax_forward(net->l10, v[10], v[11], start, end);
   end_time = timestamp_us();
   softmax_time += end_time - start_time;
+
+  total_conv_time = conv_l1_time + conv_l2_time + conv_l3_time;
+  total_relu_time = relu_l1_time + relu_l2_time + relu_l3_time;
+  total_pool_time = pool_l1_time + pool_l2_time + pool_l3_time;
 }
 
 /*
@@ -771,6 +779,11 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
   printf("THE PERCENT IN FC LEVEL 10 IS:%f\n", (float) 100*fc_time/total_runtime);
   printf("THE TIME IN SOFTMAX LEVEL 11 IS:%" PRId64 "\n", softmax_time);
   printf("THE PERCENT IN SOFTMAX LEVEL 11 IS:%f\n", (float) 100*softmax_time/total_runtime);
+
+  printf("THE TOTAL TIME IN CONV IS:%" PRId64 "\n", total_conv_time);
+  printf("THE TOTAL TIME IN RELU IS:%" PRId64 "\n", total_relu_time);
+  printf("THE TOTAL TIME IN POOL IS:%" PRId64 "\n", total_pool_time);
+
 
   free_batch(batch, 1);
 }
