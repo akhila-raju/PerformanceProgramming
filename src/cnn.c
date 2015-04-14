@@ -780,9 +780,9 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
   printf("THE TIME IN SOFTMAX LEVEL 11 IS:%" PRId64 "\n", softmax_time);
   printf("THE PERCENT IN SOFTMAX LEVEL 11 IS:%f\n", (float) 100*softmax_time/total_runtime);
 
-  printf("THE TOTAL TIME IN CONV IS:%" PRId64 "\n", total_conv_time);
-  printf("THE TOTAL TIME IN RELU IS:%" PRId64 "\n", total_relu_time);
-  printf("THE TOTAL TIME IN POOL IS:%" PRId64 "\n", total_pool_time);
+  printf("THE TOTAL PERCENT TIME IN CONV IS:%f\n", (float) 100*total_conv_time/total_runtime);
+  printf("THE TOTAL PERCENT TIME IN RELU IS:%f\n", (float) 100*total_relu_time/total_runtime);
+  printf("THE TOTAL PERCENT TIME IN POOL IS:%f\n", (float) 100*total_pool_time/total_runtime);
 
 
   free_batch(batch, 1);
