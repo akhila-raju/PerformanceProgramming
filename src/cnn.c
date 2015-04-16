@@ -185,121 +185,117 @@ conv_layer_t* make_conv_layer(int in_sx, int in_sy, int in_depth,
 }
 
 void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
-  uint64_t start_time = timestamp_us();
 
   int xy_stride = l->stride;
-  int out_sy_2 = l->out_sy;
-  int out_sx_2 = l->out_sx;
-  int out_depth_2 = l->out_depth;
+  int l_out_sy = l->out_sy;
+  int l_out_sx = l->out_sx;
+  int l_pad = l->pad;
+  vol_t* l_biases = l->biases;
+  int l_out_depth = l->out_depth;
 
   for (int i = start; i <= end; i++) {
     vol_t* V = in[i];
+    vol_t* A = out[i];
+        
     int V_sx = V->sx;
     int V_sy = V->sy;
-    vol_t* A = out[i];
-    int depth_V = V->depth;
-    double* v_2 = V->w;
-
-
-    for(int d = 0; d < out_depth_2; d++) {
+    int V_depth = V->depth;
+    double* V_w = V->w;
+  
+    for(int d = 0; d < l_out_depth; d++) {
       vol_t* f = l->filters[d];
-      int x = -l->pad;
-      int y = -l->pad;
-      int sy_2 = f->sy;
-      int sx_2 = f->sx;
-      int depth_2 = f->depth;
-      double* f_2 = f->w;
-
+      int x = -l_pad;
+      int y = -l_pad;
+      int f_sx = f->sx;
+      int f_sy = f->sy;
+      int f_depth = f->depth;
+      double* f_w = f->w;
       
-      for(int ay = 0; ay < out_sy_2; y += xy_stride, ay++) {
-        x = -l->pad;
+      for(int ay = 0; ay < l_out_sy; y += xy_stride, ay++) {
+        x = -l_pad;
         
-        for(int ax=0; ax < l->out_sx; x += xy_stride, ax++) {
+        for(int ax=0; ax < l_out_sx; x += xy_stride, ax++) {
           double val = 0.0;
-          
-          for(int fy = 0; fy < f->sy; fy++) {
-            int oy = y + fy;
-            
-          for(int fx = 0; fx < sx_2; fx++) {
-            int ox = x + fx;
-
-            for(int fy = 0; fy < sy_2; fy++) {
+            for(int fy = 0; fy < f_sy; fy++) {
               int oy = y + fy;
-              
-              if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
-                if (f->depth == 3) {
-                  val += f->w[((f->sx * fy)+fx)*f->depth] * V->w[((V_sx * oy)+ox)*V->depth];
-                  val += f->w[((f->sx * fy)+fx)*f->depth+1] * V->w[((V_sx * oy)+ox)*V->depth+1];
-                  val += f->w[((f->sx * fy)+fx)*f->depth+2] * V->w[((V_sx * oy)+ox)*V->depth+2];
+                for(int fx = 0; fx < f_sx; fx++) {
+                  int ox = x + fx;
+
+                  int V_w_index = ((V_sx * oy)+ox)*V_depth;
+                  int f_w_index = ((f_sx * fy)+fx)*f_depth;
+                
+                if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
+
+                  if (f_depth == 3) {
+                    val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
+                  }
+                  else if (f_depth == 16) {
+                    __m256d sum = _mm256_setzero_pd();
+                    double* V_w_sum = V_w + V_w_index;
+                    double* f_w_sum = f_w + f_w_index;
+
+                    __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
+                    __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
+                    __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+4); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+4); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+8); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+8); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+12); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+12); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    double newsum[4];
+                    _mm256_storeu_pd(newsum, sum);
+                    val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
+                  }
+                  else if (f_depth == 20) {
+                    __m256d sum = _mm256_setzero_pd();
+                    double* V_w_sum = V_w + V_w_index;
+                    double* f_w_sum = f_w + f_w_index;
+
+                    __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
+                    __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
+                    __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+4); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+4); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+8); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+8); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+12); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+12); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+16); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+16); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    double newsum[4];
+                    _mm256_storeu_pd(newsum, sum);
+                    val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
+                  }
                 }
-                __m256i sum = _mm_setzero_si256();
-
-                if (f->depth == 16) {
-                  __m256d sum = _mm256_setzero_pd();
-
-                  __m256d v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth); // load v vector
-                  __m256d f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth); // load f vector
-                  __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+4); // load v vector
-                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+4); // load f vector
-                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+8); // load v vector
-                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+8); // load f vector
-                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+12); // load v vector
-                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+12); // load f vector
-                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  double newsum[4];
-                  _mm256_storeu_pd(newsum, sum);
-                  val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
-                }
-
-                if (f->depth == 20) {
-                  __m256d sum = _mm256_setzero_pd();
-
-                  __m256d v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth); // load v vector
-                  __m256d f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth); // load f vector
-                  __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+4); // load v vector
-                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+4); // load f vector
-                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+8); // load v vector
-                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+8); // load f vector
-                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+12); // load v vector
-                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+12); // load f vector
-                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+16); // load v vector
-                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+16); // load f vector
-                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                  double newsum[4];
-                  _mm256_storeu_pd(newsum, sum);
-                  val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
-                }
-
-                int final_sum = 0;
-              }
-            }
+              } 
           }
-          val += l->biases->w[d];
+          val += l_biases->w[d];
           set_vol(A, ax, ay, d, val);
         }
       }
@@ -828,11 +824,12 @@ void net_forward(network_t* net, batch_t* v, int start, int end) {
 void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
   batch_t* batch = make_batch(net, 1);
 
-  for (int i = 0; i < n; i++) {
-    copy_vol(batch[0][0], input[i]);
-    net_forward(net, batch, 0, 0);
-    output[i] = batch[11][0]->w[CAT_LABEL]; 
-  }
+  #pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+      copy_vol(batch[0][0], input[i]);
+      net_forward(net, batch, 0, 0);
+      output[i] = batch[11][0]->w[CAT_LABEL]; 
+    }
 
   uint64_t total_runtime = (conv_l1_time + relu_l1_time + pool_l1_time 
     + conv_l2_time + relu_l2_time + pool_l2_time + conv_l3_time + relu_l3_time 
