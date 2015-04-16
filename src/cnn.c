@@ -189,7 +189,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   int xy_stride = l->stride;
   int l_out_sy = l->out_sy;
   int l_out_sx = l->out_sx;
-  int l_pad = l->pad;
+  int l_pad = -l->pad;
   vol_t* l_biases = l->biases;
   int l_out_depth = l->out_depth;
 
@@ -204,25 +204,29 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   
     for(int d = 0; d < l_out_depth; d++) {
       vol_t* f = l->filters[d];
-      int x = -l_pad;
-      int y = -l_pad;
+      int x = l_pad;
+      int y = l_pad;
       int f_sx = f->sx;
       int f_sy = f->sy;
       int f_depth = f->depth;
       double* f_w = f->w;
+      double end_add = l_biases->w[d];
       
       for(int ay = 0; ay < l_out_sy; y += xy_stride, ay++) {
-        x = -l_pad;
+        x = l_pad;
         
         for(int ax=0; ax < l_out_sx; x += xy_stride, ax++) {
           double val = 0.0;
+
             for(int fy = 0; fy < f_sy; fy++) {
               int oy = y + fy;
+              int V_sum = V_sx * oy;
+              int f_sum = f_sx * fy;
+
                 for(int fx = 0; fx < f_sx; fx++) {
                   int ox = x + fx;
-
-                  int V_w_index = ((V_sx * oy)+ox)*V_depth;
-                  int f_w_index = ((f_sx * fy)+fx)*f_depth;
+                  int V_w_index = ((V_sum)+ox)*V_depth;
+                  int f_w_index = ((f_sum)+fx)*f_depth;
                 
                 if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
 
@@ -295,7 +299,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                 }
               } 
           }
-          val += l_biases->w[d];
+          val += end_add;
           set_vol(A, ax, ay, d, val);
         }
       }
@@ -822,7 +826,29 @@ void net_forward(network_t* net, batch_t* v, int start, int end) {
 
 #define CAT_LABEL 3
 void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
-  //batch_t* batch = make_batch(net, 1);
+
+
+  /* Below is my larger batch implementation, its faster than batch size of 1 without openMP
+     but when i add in parallelization for some reason larger batches is slower than batch 
+     size 1. I've played around with batch sizes and it is always slower...*/
+
+  // #pragma omp parallel
+  // {
+  //   batch_t* batch = make_batch(net, 20);
+  //   #pragma omp for
+  //   for (int i = 0; i < n; i+=20) {
+  //     for (int x = 0; x < 20; x++) {
+  //       copy_vol(batch[0][x], input[x+i]);
+  //     }
+  //     net_forward(net, batch, 0, 19);
+  //     for (int x = 0; x < 20; x++) {
+  //       output[i] = batch[11][x]->w[CAT_LABEL];
+  //     } 
+  //   }
+
+  //   free_batch(batch, 20);
+  // }
+
 
   #pragma omp parallel
   {
