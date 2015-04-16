@@ -822,14 +822,20 @@ void net_forward(network_t* net, batch_t* v, int start, int end) {
 
 #define CAT_LABEL 3
 void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
-  batch_t* batch = make_batch(net, 1);
+  //batch_t* batch = make_batch(net, 1);
 
-  #pragma omp parallel for
+  #pragma omp parallel
+  {
+    batch_t* batch = make_batch(net, 1);
+    #pragma omp for
     for (int i = 0; i < n; i++) {
       copy_vol(batch[0][0], input[i]);
       net_forward(net, batch, 0, 0);
       output[i] = batch[11][0]->w[CAT_LABEL]; 
     }
+
+    free_batch(batch, 1);
+  }
 
   uint64_t total_runtime = (conv_l1_time + relu_l1_time + pool_l1_time 
     + conv_l2_time + relu_l2_time + pool_l2_time + conv_l3_time + relu_l3_time 
@@ -868,7 +874,7 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
   printf("THE TOTAL PERCENT TIME IN POOL IS:%f\n", (float) 100*total_pool_time/total_runtime);
 
 
-  free_batch(batch, 1);
+  //free_batch(batch, 1);
 }
 
 // IGNORE EVERYTHING BELOW THIS POINT -----------------------------------------
