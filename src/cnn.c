@@ -214,8 +214,11 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
       for(int ay = 0; ay < out_sy_2; y += xy_stride, ay++) {
         x = -l->pad;
         
-        for(int ax=0; ax < out_sx_2; x += xy_stride, ax++) {
-          double a = 0.0;
+        for(int ax=0; ax < l->out_sx; x += xy_stride, ax++) {
+          double val = 0.0;
+          
+          for(int fy = 0; fy < f->sy; fy++) {
+            int oy = y + fy;
             
           for(int fx = 0; fx < sx_2; fx++) {
             int ox = x + fx;
@@ -224,34 +227,80 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
               int oy = y + fy;
               
               if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
-
-                for (int i = depth_2 / 4 * 4; i < depth_2; i++) {
-                  a += f_2[((sx_2 * fy)+fx)*depth_2+i] * v_2[((V_sx * oy)+ox)*depth_V+i];
-                  
+                if (f->depth == 3) {
+                  val += f->w[((f->sx * fy)+fx)*f->depth] * V->w[((V_sx * oy)+ox)*V->depth];
+                  val += f->w[((f->sx * fy)+fx)*f->depth+1] * V->w[((V_sx * oy)+ox)*V->depth+1];
+                  val += f->w[((f->sx * fy)+fx)*f->depth+2] * V->w[((V_sx * oy)+ox)*V->depth+2];
                 }
                 __m256i sum = _mm_setzero_si256();
 
-                int sum_arr[4] = {0, 0, 0, 0};
+                if (f->depth == 16) {
+                  __m256d sum = _mm256_setzero_pd();
 
-                for (int fd = 0; fd < depth_2 / 4 * 4; fd += 4) {
+                  __m256d v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth); // load v vector
+                  __m256d f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth); // load f vector
+                  __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
 
-                  __m256i part_one =  _mm_loadu_si256( (__m256i*) f_2[((sx_2 * fy)+fx)*depth_2+fd+i] );
-                  __m256i part_two =  _mm_loadu_si256( (__m256i*) v_2[((V_sx * oy)+ox)*depth_V+fd+i] );
-                  mul_sum = _mm_mul_epi32(part_one, part_two);
-                  sum = _mm_add_epi32(mul_sum, sum);
-                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd] * v_2[((V_sx * oy)+ox)*depth_V+fd];
-                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd+1] * v_2[((V_sx * oy)+ox)*depth_V+fd+1];
-                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd+2] * v_2[((V_sx * oy)+ox)*depth_V+fd+2];
-                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd+3] * v_2[((V_sx * oy)+ox)*depth_V+fd+3];
+                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+4); // load v vector
+                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+4); // load f vector
+                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+8); // load v vector
+                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+8); // load f vector
+                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+12); // load v vector
+                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+12); // load f vector
+                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  double newsum[4];
+                  _mm256_storeu_pd(newsum, sum);
+                  val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
                 }
-                _mm_storeu_si256( (__m256i*) sum_arr, sum); 
+
+                if (f->depth == 20) {
+                  __m256d sum = _mm256_setzero_pd();
+
+                  __m256d v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth); // load v vector
+                  __m256d f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth); // load f vector
+                  __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+4); // load v vector
+                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+4); // load f vector
+                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+8); // load v vector
+                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+8); // load f vector
+                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+12); // load v vector
+                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+12); // load f vector
+                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  v_vector = _mm256_loadu_pd(V->w + ((V_sx * oy)+ox)*V->depth+16); // load v vector
+                  f_vector = _mm256_loadu_pd(f->w + ((f->sx * fy)+fx)*f->depth+16); // load f vector
+                  f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                  sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                  double newsum[4];
+                  _mm256_storeu_pd(newsum, sum);
+                  val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
+                }
 
                 int final_sum = 0;
               }
             }
           }
-          a += l->biases->w[d];
-          set_vol(A, ax, ay, d, a);
+          val += l->biases->w[d];
+          set_vol(A, ax, ay, d, val);
         }
       }
     }
