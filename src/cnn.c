@@ -188,34 +188,65 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   uint64_t start_time = timestamp_us();
 
   int xy_stride = l->stride;
+  int out_sy_2 = l->out_sy;
+  int out_sx_2 = l->out_sx;
+  int out_depth_2 = l->out_depth;
 
   for (int i = start; i <= end; i++) {
     vol_t* V = in[i];
-    vol_t* A = out[i];
-
     int V_sx = V->sx;
     int V_sy = V->sy;
+    vol_t* A = out[i];
+    int depth_V = V->depth;
+    double* v_2 = V->w;
 
 
-    
-  
-    for(int d = 0; d < l->out_depth; d++) {
+    for(int d = 0; d < out_depth_2; d++) {
       vol_t* f = l->filters[d];
       int x = -l->pad;
       int y = -l->pad;
-      for(int ay = 0; ay < l->out_sy; y += xy_stride, ay++) {
+      int sy_2 = f->sy;
+      int sx_2 = f->sx;
+      int depth_2 = f->depth;
+      double* f_2 = f->w;
+
+      
+      for(int ay = 0; ay < out_sy_2; y += xy_stride, ay++) {
         x = -l->pad;
-        for(int ax=0; ax < l->out_sx; x += xy_stride, ax++) {
+        
+        for(int ax=0; ax < out_sx_2; x += xy_stride, ax++) {
           double a = 0.0;
-          for(int fy = 0; fy < f->sy; fy++) {
-            int oy = y + fy;
-            for(int fx = 0; fx < f->sx; fx++) {
-              int ox = x + fx;
+            
+          for(int fx = 0; fx < sx_2; fx++) {
+            int ox = x + fx;
+
+            for(int fy = 0; fy < sy_2; fy++) {
+              int oy = y + fy;
+              
               if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
-                for(int fd=0;fd < f->depth; fd++) {
-                  printf("The depth: %" PRId64 "\n", f->depth);
-                  a += f->w[((f->sx * fy)+fx)*f->depth+fd] * V->w[((V_sx * oy)+ox)*V->depth+fd];
+
+                for (int i = depth_2 / 4 * 4; i < depth_2; i++) {
+                  a += f_2[((sx_2 * fy)+fx)*depth_2+i] * v_2[((V_sx * oy)+ox)*depth_V+i];
+                  
                 }
+                __m256i sum = _mm_setzero_si256();
+
+                int sum_arr[4] = {0, 0, 0, 0};
+
+                for (int fd = 0; fd < depth_2 / 4 * 4; fd += 4) {
+
+                  __m256i part_one =  _mm_loadu_si256( (__m256i*) f_2[((sx_2 * fy)+fx)*depth_2+fd+i] );
+                  __m256i part_two =  _mm_loadu_si256( (__m256i*) v_2[((V_sx * oy)+ox)*depth_V+fd+i] );
+                  mul_sum = _mm_mul_epi32(part_one, part_two);
+                  sum = _mm_add_epi32(mul_sum, sum);
+                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd] * v_2[((V_sx * oy)+ox)*depth_V+fd];
+                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd+1] * v_2[((V_sx * oy)+ox)*depth_V+fd+1];
+                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd+2] * v_2[((V_sx * oy)+ox)*depth_V+fd+2];
+                  // a += f_2[((sx_2 * fy)+fx)*depth_2+fd+3] * v_2[((V_sx * oy)+ox)*depth_V+fd+3];
+                }
+                _mm_storeu_si256( (__m256i*) sum_arr, sum); 
+
+                int final_sum = 0;
               }
             }
           }
