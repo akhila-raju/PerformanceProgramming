@@ -54,6 +54,7 @@ typedef struct vol {
   double* w;
 } vol_t;
 
+
 /*
  * Set the value at a specific entry of the array.
  */
@@ -192,7 +193,11 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   int l_pad = -l->pad;
   vol_t* l_biases = l->biases;
   int l_out_depth = l->out_depth;
-
+  double newsum[4];
+  double* V_w_sum;
+  double* f_w_sum;
+  int y;
+  int x;
   for (int i = start; i <= end; i++) {
     vol_t* V = in[i];
     vol_t* A = out[i];
@@ -204,8 +209,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   
     for(int d = 0; d < l_out_depth; d++) {
       vol_t* f = l->filters[d];
-      int x = l_pad;
-      int y = l_pad;
+      y = l_pad;
       int f_sx = f->sx;
       int f_sy = f->sy;
       int f_depth = f->depth;
@@ -228,15 +232,15 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                   int V_w_index = ((V_sum)+ox)*V_depth;
                   int f_w_index = ((f_sum)+fx)*f_depth;
                 
-                if(oy >= 0 && oy < V_sy && ox >=0 && ox < V_sx) {
+                if(oy > -1 && oy < V_sy && ox > -1 && ox < V_sx) {
 
                   if (f_depth == 3) {
                     val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
                   }
                   else if (f_depth == 16) {
                     __m256d sum = _mm256_setzero_pd();
-                    double* V_w_sum = V_w + V_w_index;
-                    double* f_w_sum = f_w + f_w_index;
+                    V_w_sum = V_w + V_w_index;
+                    f_w_sum = f_w + f_w_index;
 
                     __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
                     __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
@@ -258,14 +262,13 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                     f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
                     sum = _mm256_add_pd(sum, f_times_v); // add vectors
 
-                    double newsum[4];
                     _mm256_storeu_pd(newsum, sum);
                     val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
                   }
                   else if (f_depth == 20) {
                     __m256d sum = _mm256_setzero_pd();
-                    double* V_w_sum = V_w + V_w_index;
-                    double* f_w_sum = f_w + f_w_index;
+                    V_w_sum = V_w + V_w_index;
+                    f_w_sum = f_w + f_w_index;
 
                     __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
                     __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
@@ -292,7 +295,6 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                     f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
                     sum = _mm256_add_pd(sum, f_times_v); // add vectors
 
-                    double newsum[4];
                     _mm256_storeu_pd(newsum, sum);
                     val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
                   }
@@ -735,84 +737,84 @@ void free_batch(batch_t* v, int size) {
  * to process (start and end are inclusive).
  */
 
-uint64_t conv_l1_time = 0;
-uint64_t relu_l1_time = 0;
-uint64_t pool_l1_time = 0;
-uint64_t conv_l2_time = 0;
-uint64_t relu_l2_time = 0;
-uint64_t pool_l2_time = 0;
-uint64_t conv_l3_time = 0;
-uint64_t relu_l3_time = 0;
-uint64_t pool_l3_time = 0;
-uint64_t fc_time = 0;
-uint64_t softmax_time = 0;
-uint64_t total_conv_time = 0;
-uint64_t total_relu_time = 0;
-uint64_t total_pool_time = 0;
+// uint64_t conv_l1_time = 0;
+// uint64_t relu_l1_time = 0;
+// uint64_t pool_l1_time = 0;
+// uint64_t conv_l2_time = 0;
+// uint64_t relu_l2_time = 0;
+// uint64_t pool_l2_time = 0;
+// uint64_t conv_l3_time = 0;
+// uint64_t relu_l3_time = 0;
+// uint64_t pool_l3_time = 0;
+// uint64_t fc_time = 0;
+// uint64_t softmax_time = 0;
+// uint64_t total_conv_time = 0;
+// uint64_t total_relu_time = 0;
+// uint64_t total_pool_time = 0;
 
 
 void net_forward(network_t* net, batch_t* v, int start, int end) {
-  uint64_t end_time;
-  uint64_t start_time;
+  //uint64_t end_time;
+  //uint64_t start_time;
   
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   conv_forward(net->l0, v[0], v[1], start, end);
-  end_time = timestamp_us();
-  conv_l1_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //conv_l1_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   relu_forward(net->l1, v[1], v[2], start, end);
-  end_time = timestamp_us();
-  relu_l1_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //relu_l1_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   pool_forward(net->l2, v[2], v[3], start, end);
-  end_time = timestamp_us();
-  pool_l1_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //pool_l1_time += end_time - start_time;
   
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   conv_forward(net->l3, v[3], v[4], start, end);
-  end_time = timestamp_us();
-  conv_l2_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //conv_l2_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   relu_forward(net->l4, v[4], v[5], start, end);
-  end_time = timestamp_us();
-  relu_l2_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //relu_l2_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   pool_forward(net->l5, v[5], v[6], start, end);
-  end_time = timestamp_us();
-  pool_l2_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //pool_l2_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   conv_forward(net->l6, v[6], v[7], start, end);
-  end_time = timestamp_us();
-  conv_l3_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //conv_l3_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   relu_forward(net->l7, v[7], v[8], start, end);
-  end_time = timestamp_us();
-  relu_l3_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //relu_l3_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   pool_forward(net->l8, v[8], v[9], start, end);
-  end_time = timestamp_us();
-  pool_l3_time += end_time - start_time;
+  //end_time = timestamp_us();
+ // pool_l3_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   fc_forward(net->l9, v[9], v[10], start, end);
-  end_time = timestamp_us();
-  fc_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //fc_time += end_time - start_time;
 
-  start_time = timestamp_us();
+  //start_time = timestamp_us();
   softmax_forward(net->l10, v[10], v[11], start, end);
-  end_time = timestamp_us();
-  softmax_time += end_time - start_time;
+  //end_time = timestamp_us();
+  //softmax_time += end_time - start_time;
 
-  total_conv_time = conv_l1_time + conv_l2_time + conv_l3_time;
-  total_relu_time = relu_l1_time + relu_l2_time + relu_l3_time;
-  total_pool_time = pool_l1_time + pool_l2_time + pool_l3_time;
+  //total_conv_time = conv_l1_time + conv_l2_time + conv_l3_time;
+  //total_relu_time = relu_l1_time + relu_l2_time + relu_l3_time;
+  //total_pool_time = pool_l1_time + pool_l2_time + pool_l3_time;
 }
 
 /*
@@ -832,72 +834,130 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
      but when i add in parallelization for some reason larger batches is slower than batch 
      size 1. I've played around with batch sizes and it is always slower...*/
 
-  // #pragma omp parallel
+ #pragma omp parallel
+  {
+    batch_t* batch = make_batch(net, 20);
+    #pragma omp for
+    for (int i = 0; i < n; i+=20) {
+      for (int x = 0; x < 20; x++) {
+        copy_vol(batch[0][x], input[i+x]);     
+      }
+      net_forward(net, batch, 0, 19);
+      for (int z = 0; z < n; z+=20) {
+        output[i+z] = batch[11][z]->w[CAT_LABEL];
+      }
+    }
+
+    free_batch(batch, 20);
+  }
+
+  //  #pragma omp parallel
   // {
-  //   batch_t* batch = make_batch(net, 20);
+  //   batch_t* batch = make_batch(net, 1);
   //   #pragma omp for
-  //   for (int i = 0; i < n; i+=20) {
-  //     for (int x = 0; x < 20; x++) {
-  //       copy_vol(batch[0][x], input[x+i]);
-  //     }
-  //     net_forward(net, batch, 0, 19);
-  //     for (int x = 0; x < 20; x++) {
-  //       output[i] = batch[11][x]->w[CAT_LABEL];
-  //     } 
+  //   for (int i = 0; i < n; i+=1) {
+  //     copy_vol(batch[0][0], input[i]);
+  //     net_forward(net, batch, 0, 0);
+  //     output[i] = batch[11][0]->w[CAT_LABEL];
   //   }
 
-  //   free_batch(batch, 20);
+  //   free_batch(batch, 1);
   // }
 
 
-  #pragma omp parallel
-  {
-    batch_t* batch = make_batch(net, 1);
-    #pragma omp for
-    for (int i = 0; i < n; i++) {
-      copy_vol(batch[0][0], input[i]);
-      net_forward(net, batch, 0, 0);
-      output[i] = batch[11][0]->w[CAT_LABEL]; 
-    }
+    // batch_t* batch = make_batch(net, 1);
+    // for (int i = 0; i < n; i+=1) {
+    //   copy_vol(batch[0][0], input[i]);
+    //   net_forward(net, batch, 0, 0);
+    //   output[i] = batch[11][0]->w[CAT_LABEL];
+    // }
 
-    free_batch(batch, 1);
-  }
-
-  uint64_t total_runtime = (conv_l1_time + relu_l1_time + pool_l1_time 
-    + conv_l2_time + relu_l2_time + pool_l2_time + conv_l3_time + relu_l3_time 
-    + pool_l3_time + fc_time + softmax_time);
-
-  printf("TOTAL TIME:%" PRId64 "\n", total_runtime);
-  printf("THE TIME IN CONV LEVEL 1 IS:%" PRId64 "\n", conv_l1_time);
-  printf("THE PERCENT IN CONV LEVEL 1 IS:%f\n", (float) 100*conv_l1_time/total_runtime);
-  printf("THE TIME IN RELU LEVEL 2 IS:%" PRId64 "\n", relu_l1_time);
-  printf("THE PERCENT IN RELU LEVEL 2 IS:%f\n", (float) 100*relu_l1_time/total_runtime);
-  printf("THE TIME IN POOL LEVEL 3 IS:%" PRId64 "\n", pool_l1_time);
-  printf("THE PERCENT IN POOL LEVEL 3 IS:%f\n", (float) 100*pool_l1_time/total_runtime);
-
-  printf("THE TIME IN CONV LEVEL 4 IS:%" PRId64 "\n", conv_l2_time);
-  printf("THE PERCENT IN CONV LEVEL 4 IS:%f\n", (float) 100*conv_l2_time/total_runtime);
-  printf("THE TIME IN RELU LEVEL 5 IS:%" PRId64 "\n", relu_l2_time);
-  printf("THE PERCENT IN RELU LEVEL 5 IS:%f\n", (float) 100*relu_l2_time/total_runtime);
-  printf("THE TIME IN POOL LEVEL 6 IS:%" PRId64 "\n", pool_l2_time);
-  printf("THE PERCENT IN POOL LEVEL 6 IS:%f\n\n", (float) 100*pool_l2_time/total_runtime);
-
-  printf("THE TIME IN CONV LEVEL 7 IS:%" PRId64 "\n", conv_l3_time);
-  printf("THE PERCENT IN CONV LEVEL 7 IS:%f\n", (float) 100*conv_l3_time/total_runtime);
-  printf("THE TIME IN RELU LEVEL 8 IS:%" PRId64 "\n", relu_l3_time);
-  printf("THE PERCENT IN RELU LEVEL 8 IS:%f\n", (float) 100*relu_l3_time/total_runtime);
-  printf("THE TIME IN POOL LEVEL 9 IS:%" PRId64 "\n", pool_l3_time);
-  printf("THE PERCENT IN POOL LEVEL 9 IS:%f\n\n", (float) 100*pool_l3_time/total_runtime);
+    // free_batch(batch, 1);
 
 
-  printf("THE TIME IN FC LEVEL 10 IS:%" PRId64 "\n", fc_time);
-  printf("THE PERCENT IN FC LEVEL 10 IS:%f\n", (float) 100*fc_time/total_runtime);
-  printf("THE TIME IN SOFTMAX LEVEL 11 IS:%" PRId64 "\n", softmax_time);
-  printf("THE PERCENT IN SOFTMAX LEVEL 11 IS:%f\n", (float) 100*softmax_time/total_runtime);
+  // #pragma omp parallel
+  // {
+  //   batch_t* batch = make_batch(net, 1);
+  //    // batch_t* batch2 = make_batch(net, 1);
+  //    //  batch_t* batch3 = make_batch(net, 1);
+  //    //   batch_t* batch4 = make_batch(net, 1);
+  //   #pragma omp for
+    
+  //   for (int i = 0; i < n; i+=1) {
 
-  printf("THE TOTAL PERCENT TIME IN CONV IS:%f\n", (float) 100*total_conv_time/total_runtime);
-  printf("THE TOTAL PERCENT TIME IN RELU IS:%f\n", (float) 100*total_relu_time/total_runtime);
-  printf("THE TOTAL PERCENT TIME IN POOL IS:%f\n", (float) 100*total_pool_time/total_runtime);
+  //     copy_vol(batch[0][0], input[i]);
+  //     net_forward(net, batch, 0, 0);
+  //     output[i] = batch[11][0]->w[CAT_LABEL];
+
+  //     // copy_vol(batch2[0][0], input[i+1]);
+  //     // net_forward(net, batch2, 0, 0);
+  //     // output[i+1] = batch2[11][0]->w[CAT_LABEL];
+
+  //     // copy_vol(batch3[0][0], input[i+2]);
+  //     // net_forward(net, batch3, 0, 0);
+  //     // output[i+2] = batch3[11][0]->w[CAT_LABEL];
+      
+  //     // copy_vol(batch4[0][0], input[i+3]);
+  //     // net_forward(net, batch4, 0, 0);
+  //     // output[i+3] = batch4[11][0]->w[CAT_LABEL];
+
+  //     // net_forward(net, batch5, 0, 0);
+  //     // net_forward(net, batch6, 0, 0);
+  //     // net_forward(net, batch7, 0, 0);
+  //     // net_forward(net, batch8, 0, 0);
+     
+      
+  //     // output[i+4] = batch5[11][0]->w[CAT_LABEL];
+  //     // output[i+5] = batch6[11][0]->w[CAT_LABEL]; 
+  //     // output[i+6] = batch7[11][0]->w[CAT_LABEL];
+  //     // output[i+6] = batch8[11][0]->w[CAT_LABEL];
+  //   }
+
+  //   free_batch(batch, 1);
+  //   // free_batch(batch2, 1);
+  //   // free_batch(batch3, 1);
+  //   // free_batch(batch4, 1);
+  // //   free_batch(batch5, 1);
+  // //   free_batch(batch6, 1);
+  // //   free_batch(batch7, 1);
+  // //   free_batch(batch8, 1);
+  //  }
+
+  // uint64_t total_runtime = (conv_l1_time + relu_l1_time + pool_l1_time 
+  //   + conv_l2_time + relu_l2_time + pool_l2_time + conv_l3_time + relu_l3_time 
+  //   + pool_l3_time + fc_time + softmax_time);
+
+  // printf("TOTAL TIME:%" PRId64 "\n", total_runtime);
+  // printf("THE TIME IN CONV LEVEL 1 IS:%" PRId64 "\n", conv_l1_time);
+  // printf("THE PERCENT IN CONV LEVEL 1 IS:%f\n", (float) 100*conv_l1_time/total_runtime);
+  // printf("THE TIME IN RELU LEVEL 2 IS:%" PRId64 "\n", relu_l1_time);
+  // printf("THE PERCENT IN RELU LEVEL 2 IS:%f\n", (float) 100*relu_l1_time/total_runtime);
+  // printf("THE TIME IN POOL LEVEL 3 IS:%" PRId64 "\n", pool_l1_time);
+  // printf("THE PERCENT IN POOL LEVEL 3 IS:%f\n", (float) 100*pool_l1_time/total_runtime);
+
+  // printf("THE TIME IN CONV LEVEL 4 IS:%" PRId64 "\n", conv_l2_time);
+  // printf("THE PERCENT IN CONV LEVEL 4 IS:%f\n", (float) 100*conv_l2_time/total_runtime);
+  // printf("THE TIME IN RELU LEVEL 5 IS:%" PRId64 "\n", relu_l2_time);
+  // printf("THE PERCENT IN RELU LEVEL 5 IS:%f\n", (float) 100*relu_l2_time/total_runtime);
+  // printf("THE TIME IN POOL LEVEL 6 IS:%" PRId64 "\n", pool_l2_time);
+  // printf("THE PERCENT IN POOL LEVEL 6 IS:%f\n\n", (float) 100*pool_l2_time/total_runtime);
+
+  // printf("THE TIME IN CONV LEVEL 7 IS:%" PRId64 "\n", conv_l3_time);
+  // printf("THE PERCENT IN CONV LEVEL 7 IS:%f\n", (float) 100*conv_l3_time/total_runtime);
+  // printf("THE TIME IN RELU LEVEL 8 IS:%" PRId64 "\n", relu_l3_time);
+  // printf("THE PERCENT IN RELU LEVEL 8 IS:%f\n", (float) 100*relu_l3_time/total_runtime);
+  // printf("THE TIME IN POOL LEVEL 9 IS:%" PRId64 "\n", pool_l3_time);
+  // printf("THE PERCENT IN POOL LEVEL 9 IS:%f\n\n", (float) 100*pool_l3_time/total_runtime);
+
+
+  // printf("THE TIME IN FC LEVEL 10 IS:%" PRId64 "\n", fc_time);
+  // printf("THE PERCENT IN FC LEVEL 10 IS:%f\n", (float) 100*fc_time/total_runtime);
+  // printf("THE TIME IN SOFTMAX LEVEL 11 IS:%" PRId64 "\n", softmax_time);
+  // printf("THE PERCENT IN SOFTMAX LEVEL 11 IS:%f\n", (float) 100*softmax_time/total_runtime);
+
+  // printf("THE TOTAL PERCENT TIME IN CONV IS:%f\n", (float) 100*total_conv_time/total_runtime);
+  // printf("THE TOTAL PERCENT TIME IN RELU IS:%f\n", (float) 100*total_relu_time/total_runtime);
+  // printf("THE TOTAL PERCENT TIME IN POOL IS:%f\n", (float) 100*total_pool_time/total_runtime);
 
 
   //free_batch(batch, 1);
