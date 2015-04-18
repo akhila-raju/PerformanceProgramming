@@ -369,9 +369,15 @@ relu_layer_t* make_relu_layer(int in_sx, int in_sy, int in_depth) {
 }
 
 void relu_forward(relu_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
+  int in_sx_sy_depth = l->in_sx*l->in_sy*l->in_depth;
+
   for (int j = start; j <= end; j++) {
-    for (int i = 0; i < l->in_sx*l->in_sy*l->in_depth; i++) {
-      out[j]->w[i] = (in[j]->w[i] < 0.0) ? 0.0 : in[j]->w[i];
+    double* out_j_w = out[j]->w;
+    double* in_j_w = in[j]->w;
+
+    for (int i = 0; i < in_sx_sy_depth; i++) {
+      out_j_w[i] = (in_j_w[i] < 0.0) ? 0.0 : in_j_w[i];
+
     }
   }
 }
@@ -423,22 +429,38 @@ void pool_forward(pool_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   for (int i = start; i <= end; i++) {
     vol_t* V = in[i];
     vol_t* A = out[i];
-        
     int n=0;
-    for(int d=0;d<l->out_depth;d++) {
-      int x = -l->pad;
-      int y = -l->pad;
-      for(int ax=0; ax<l->out_sx; x+=l->stride,ax++) {
-        y = -l->pad;
-        for(int ay=0; ay<l->out_sy; y+=l->stride,ay++) {
-  
+    int l_pad = -l->pad;
+    int V_sx = V->sx;
+    int V_sy = V->sy;
+    int l_out_sy = l->out_sy;
+    int l_out_sx = l->out_sx;
+    int xy_stride = l->stride;
+    int l_sx = l->sx;
+    int l_sy = l->sy;
+    int l_out_depth = l->out_depth;
+
+    for(int d=0; d < l_out_depth; d++) {
+      int x = l_pad;
+      int y = l_pad;
+
+      for(int ax=0; ax < l_out_sx; x += xy_stride,ax++) {
+        y = l_pad;
+
+        for(int ay=0; ay < l_out_sy; y += xy_stride,ay++) {
           double a = -99999;
-          for(int fx=0;fx<l->sx;fx++) {
-            for(int fy=0;fy<l->sy;fy++) {
-              int oy = y+fy;
-              int ox = x+fx;
-              if(oy>=0 && oy<V->sy && ox>=0 && ox<V->sx) {
+
+          for(int fx=0; fx < l_sx; fx++) {
+              int oy;
+              int ox;
+
+            for(int fy=0; fy < l_sy; fy++) {
+              oy = y+fy;
+              ox = x+fx;
+
+              if(oy >= 0 && oy < V_sy && ox >= 0 && ox < V_sx) {
                 double v = get_vol(V, ox, oy, d);
+
                 if(v > a) { a = v; }
               }
             }
@@ -505,16 +527,25 @@ fc_layer_t* make_fc_layer(int in_sx, int in_sy, int in_depth,
 
 void fc_forward(fc_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
   for (int j = start; j <= end; j++) {
-    vol_t* V = in[j];
-    vol_t* A = out[j];
+    double a;
+    double* l_biases_w = l->biases->w;
+    int l_out_depth = l->out_depth;
+    int l_num_inputs = l->num_inputs;
+    double* V_w = in[j]->w;
+    double* A_w = out[j]->w;
+
         
-    for(int i=0;i<l->out_depth;i++) {
-      double a = 0.0;
-      for(int d=0;d<l->num_inputs;d++) {
-        a += V->w[d] * l->filters[i]->w[d];
+    for(int i=0; i < l_out_depth; i++) {
+      a = 0.0;
+      double* l_filters_i_w = l->filters[i]->w;
+
+      for(int d=0; d < l_num_inputs; d++) {
+        a += V_w[d] * l_filters_i_w[d];
       }
-      a += l->biases->w[i];
-      A->w[i] = a;
+
+      a += l_biases_w[i];
+      A_w[i] = a;
+
     }
   }
 }
@@ -582,30 +613,34 @@ softmax_layer_t* make_softmax_layer(int in_sx, int in_sy, int in_depth) {
 
 void softmax_forward(softmax_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
   double es[MAX_ES];
+  int l_out_depth = l->out_depth;
 
   for (int j = start; j <= end; j++) {
-    vol_t* V = in[j];
-    vol_t* A = out[j];
+    double* V_w = in[j]->w;
+    double* A_w = out[j]->w;
   
     // compute max activation
-    double amax = V->w[0];
-    for(int i=1;i<l->out_depth;i++) {
-      if(V->w[i] > amax) amax = V->w[i];
+    double amax = V_w[0];
+
+    for(int i=1;i < l_out_depth; i++) {
+      if(V_w[i] > amax) amax = V_w[i];
     }
   
     // compute exponentials (carefully to not blow up)
     double esum = 0.0;
-    for(int i=0;i<l->out_depth;i++) {
-      double e = exp(V->w[i] - amax);
+
+    for(int i=0; i < l_out_depth; i++) {
+      double e = exp(V_w[i] - amax);
       esum += e;
       es[i] = e;
     }
   
     // normalize and output to sum to one
-    for(int i=0;i<l->out_depth;i++) {
+    for(int i=0; i < l_out_depth; i++) {
       es[i] /= esum;
-      A->w[i] = es[i];
+      A_w[i] = es[i];
     }
+
   }
 }
 
