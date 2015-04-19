@@ -369,15 +369,9 @@ relu_layer_t* make_relu_layer(int in_sx, int in_sy, int in_depth) {
 }
 
 void relu_forward(relu_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
-  int in_sx_sy_depth = l->in_sx*l->in_sy*l->in_depth;
-
   for (int j = start; j <= end; j++) {
-    double* out_j_w = out[j]->w;
-    double* in_j_w = in[j]->w;
-
-    for (int i = 0; i < in_sx_sy_depth; i++) {
-      out_j_w[i] = (in_j_w[i] < 0.0) ? 0.0 : in_j_w[i];
-
+    for (int i = 0; i < l->in_sx*l->in_sy*l->in_depth; i++) {
+      out[j]->w[i] = (in[j]->w[i] < 0.0) ? 0.0 : in[j]->w[i];
     }
   }
 }
@@ -429,38 +423,22 @@ void pool_forward(pool_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   for (int i = start; i <= end; i++) {
     vol_t* V = in[i];
     vol_t* A = out[i];
+        
     int n=0;
-    int l_pad = -l->pad;
-    int V_sx = V->sx;
-    int V_sy = V->sy;
-    int l_out_sy = l->out_sy;
-    int l_out_sx = l->out_sx;
-    int xy_stride = l->stride;
-    int l_sx = l->sx;
-    int l_sy = l->sy;
-    int l_out_depth = l->out_depth;
-
-    for(int d=0; d < l_out_depth; d++) {
-      int x = l_pad;
-      int y = l_pad;
-
-      for(int ax=0; ax < l_out_sx; x += xy_stride,ax++) {
-        y = l_pad;
-
-        for(int ay=0; ay < l_out_sy; y += xy_stride,ay++) {
+    for(int d=0;d<l->out_depth;d++) {
+      int x = -l->pad;
+      int y = -l->pad;
+      for(int ax=0; ax<l->out_sx; x+=l->stride,ax++) {
+        y = -l->pad;
+        for(int ay=0; ay<l->out_sy; y+=l->stride,ay++) {
+  
           double a = -99999;
-
-          for(int fx=0; fx < l_sx; fx++) {
-              int oy;
-              int ox;
-
-            for(int fy=0; fy < l_sy; fy++) {
-              oy = y+fy;
-              ox = x+fx;
-
-              if(oy >= 0 && oy < V_sy && ox >= 0 && ox < V_sx) {
+          for(int fx=0;fx<l->sx;fx++) {
+            for(int fy=0;fy<l->sy;fy++) {
+              int oy = y+fy;
+              int ox = x+fx;
+              if(oy>=0 && oy<V->sy && ox>=0 && ox<V->sx) {
                 double v = get_vol(V, ox, oy, d);
-
                 if(v > a) { a = v; }
               }
             }
@@ -527,25 +505,16 @@ fc_layer_t* make_fc_layer(int in_sx, int in_sy, int in_depth,
 
 void fc_forward(fc_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
   for (int j = start; j <= end; j++) {
-    double a;
-    double* l_biases_w = l->biases->w;
-    int l_out_depth = l->out_depth;
-    int l_num_inputs = l->num_inputs;
-    double* V_w = in[j]->w;
-    double* A_w = out[j]->w;
-
+    vol_t* V = in[j];
+    vol_t* A = out[j];
         
-    for(int i=0; i < l_out_depth; i++) {
-      a = 0.0;
-      double* l_filters_i_w = l->filters[i]->w;
-
-      for(int d=0; d < l_num_inputs; d++) {
-        a += V_w[d] * l_filters_i_w[d];
+    for(int i=0;i<l->out_depth;i++) {
+      double a = 0.0;
+      for(int d=0;d<l->num_inputs;d++) {
+        a += V->w[d] * l->filters[i]->w[d];
       }
-
-      a += l_biases_w[i];
-      A_w[i] = a;
-
+      a += l->biases->w[i];
+      A->w[i] = a;
     }
   }
 }
@@ -613,34 +582,30 @@ softmax_layer_t* make_softmax_layer(int in_sx, int in_sy, int in_depth) {
 
 void softmax_forward(softmax_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
   double es[MAX_ES];
-  int l_out_depth = l->out_depth;
 
   for (int j = start; j <= end; j++) {
-    double* V_w = in[j]->w;
-    double* A_w = out[j]->w;
+    vol_t* V = in[j];
+    vol_t* A = out[j];
   
     // compute max activation
-    double amax = V_w[0];
-
-    for(int i=1;i < l_out_depth; i++) {
-      if(V_w[i] > amax) amax = V_w[i];
+    double amax = V->w[0];
+    for(int i=1;i<l->out_depth;i++) {
+      if(V->w[i] > amax) amax = V->w[i];
     }
   
     // compute exponentials (carefully to not blow up)
     double esum = 0.0;
-
-    for(int i=0; i < l_out_depth; i++) {
-      double e = exp(V_w[i] - amax);
+    for(int i=0;i<l->out_depth;i++) {
+      double e = exp(V->w[i] - amax);
       esum += e;
       es[i] = e;
     }
   
     // normalize and output to sum to one
-    for(int i=0; i < l_out_depth; i++) {
+    for(int i=0;i<l->out_depth;i++) {
       es[i] /= esum;
-      A_w[i] = es[i];
+      A->w[i] = es[i];
     }
-
   }
 }
 
@@ -869,35 +834,35 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
      but when i add in parallelization for some reason larger batches is slower than batch 
      size 1. I've played around with batch sizes and it is always slower...*/
 
- // #pragma omp parallel
- //  {
- //    batch_t* batch = make_batch(net, 20);
- //    #pragma omp for
- //    for (int i = 0; i < n; i+=20) {
- //      for (int x = 0; x < 20; x++) {
- //        copy_vol(batch[0][x], input[i+x]);     
- //      }
- //      net_forward(net, batch, 0, 19);
- //      for (int z = 0; z < 20; z++) {
- //        output[i] = batch[11][z]->w[CAT_LABEL];
- //      }
- //    }
-
- //    free_batch(batch, 20);
- //  }
-
-   #pragma omp parallel
+ #pragma omp parallel
   {
-    batch_t* batch = make_batch(net, 1);
+    batch_t* batch = make_batch(net, 20);
     #pragma omp for
-    for (int i = 0; i < n; i+=1) {
-      copy_vol(batch[0][0], input[i]);
-      net_forward(net, batch, 0, 0);
-      output[i] = batch[11][0]->w[CAT_LABEL];
+    for (int i = 0; i < n; i+=20) {
+      for (int x = 0; x < 20; x++) {
+        copy_vol(batch[0][x], input[i+x]);     
+      }
+      net_forward(net, batch, 0, 19);
+      for (int z = 0; z < n; z+=20) {
+        output[i+z] = batch[11][z]->w[CAT_LABEL];
+      }
     }
 
-    free_batch(batch, 1);
+    free_batch(batch, 20);
   }
+
+  //  #pragma omp parallel
+  // {
+  //   batch_t* batch = make_batch(net, 1);
+  //   #pragma omp for
+  //   for (int i = 0; i < n; i+=1) {
+  //     copy_vol(batch[0][0], input[i]);
+  //     net_forward(net, batch, 0, 0);
+  //     output[i] = batch[11][0]->w[CAT_LABEL];
+  //   }
+
+  //   free_batch(batch, 1);
+  // }
 
 
     // batch_t* batch = make_batch(net, 1);
