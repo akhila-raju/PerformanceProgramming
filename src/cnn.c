@@ -187,7 +187,6 @@ conv_layer_t* make_conv_layer(int in_sx, int in_sy, int in_depth,
 
 void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
 
-  //int xy_stride = l->stride;
   int l_out_sy = l->out_sy;
   int l_out_sx = l->out_sx;
   vol_t* l_biases = l->biases;
@@ -224,11 +223,12 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
     for(d = 0; d < l_out_depth; d++) {
       vol_t* f = l->filters[d];
       y = -2;
-      f_sx = f->sx;
+      f_sx= f->sx;
       f_sy = f->sy;
       f_depth = f->depth;
       f_w = f->w;
       end_add = l_biases->w[d];
+      //printf("%lf\n", end_add);
       
       for(ay = 0; ay < l_out_sy; y += 1, ay++) {
         x = -2;
@@ -238,15 +238,15 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
 
             for(fy = 0; fy < f_sy; fy++) {
               oy = y + fy;
-              V_sum = V_sx * oy;
-              f_sum = f_sx * fy;
+              if (oy > -1 && oy < V_sy) {
+                V_sum = V_sx * oy;
+                f_sum = f_sx * fy;
 
-                for(fx = 0; fx < f_sx && oy > -1 && oy < V_sy; fx++) {
+                for(fx = 0; fx < f_sx; fx++) {
                   ox = x + fx;
+                  if(ox > -1 && ox < V_sx) {
                   V_w_index = ((V_sum)+ox)*V_depth;
                   f_w_index = ((f_sum)+fx)*f_depth;
-                
-                if(ox > -1 && ox < V_sx) {
 
                   if (f_depth == 3) {
                     val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
@@ -278,7 +278,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
 
                     val += sum[0] + sum[1] + sum[2] + sum[3];
                   }
-                  else if (f_depth == 20) {
+                  else {
                     __m256d sum = _mm256_setzero_pd();
                     V_w_sum = V_w + V_w_index;
                     f_w_sum = f_w + f_w_index;
@@ -311,6 +311,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                     val += sum[0] + sum[1] + sum[2] + sum[3];
                   }
                 }
+              }
               } 
           }
           val += end_add;

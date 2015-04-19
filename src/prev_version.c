@@ -243,15 +243,15 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                   int f_w_index = ((f_sum)+fx)*f_depth;
                 
                 if(oy > -1 && oy < V_sy && ox > -1 && ox < V_sx) {
-                  printf("depth: %d\n", f_depth);
-                  // if (f_depth == 3) {
-                  //   printf("This is at 0: %d" f_w[f_w_index]);
-                  //   printf("This is at 1: %d" f_w[f_w_index]);
-                  //   printf("This is at 2: %d" f_w[f_w_index]);
-                  //   printf("This is at 3: %d" f_w[f_w_index]);
-                  //   printf("This is at 4: %d" f_w[f_w_index]);
-                  //   val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
-                  // }
+
+                  if (f_depth == 3) {
+                    printf("This is at 0: %d" f_w[f_w_index]);
+                    printf("This is at 1: %d" f_w[f_w_index]);
+                    printf("This is at 2: %d" f_w[f_w_index]);
+                    printf("This is at 3: %d" f_w[f_w_index]);
+                    printf("This is at 4: %d" f_w[f_w_index]);
+                    val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
+                  }
                   else if (f_depth == 16) {
                     __m256d sum = _mm256_setzero_pd();
                     V_w_sum = V_w + V_w_index;
