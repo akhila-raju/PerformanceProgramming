@@ -198,24 +198,34 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
   double* f_w_sum;
   int y;
   int x;
-  for (int i = start; i <= end; i++) {
-    vol_t* V = in[i];
-    vol_t* A = out[i];
+  // for (int i = start; i <= end; i++) {
+  //   vol_t* V = in[i];
+  //   vol_t* A = out[i];
         
-    int V_sx = V->sx;
-    int V_sy = V->sy;
-    int V_depth = V->depth;
-    double* V_w = V->w;
+  //   int V_sx = V->sx;
+  //   int V_sy = V->sy;
+  //   int V_depth = V->depth;
+  //   double* V_w = V->w;
   
-    for(int d = 0; d < l_out_depth; d++) {
-      vol_t* f = l->filters[d];
-      y = l_pad;
-      int f_sx = f->sx;
-      int f_sy = f->sy;
-      int f_depth = f->depth;
-      double* f_w = f->w;
-      double end_add = l_biases->w[d];
-      
+  for(int d = 0; d < l_out_depth; d++) {
+    vol_t* f = l->filters[d];
+    y = l_pad;
+    int f_sx = f->sx;
+    int f_sy = f->sy;
+    int f_depth = f->depth;
+    double* f_w = f->w;
+    double end_add = l_biases->w[d];
+
+
+    //for (int i = start; i <= end; i++) {
+      vol_t* V = in[i];
+      vol_t* A = out[i];
+          
+      int V_sx = V->sx;
+      int V_sy = V->sy;
+      int V_depth = V->depth;
+      double* V_w = V->w;
+        
       for(int ay = 0; ay < l_out_sy; y += xy_stride, ay++) {
         x = l_pad;
         
@@ -233,10 +243,15 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                   int f_w_index = ((f_sum)+fx)*f_depth;
                 
                 if(oy > -1 && oy < V_sy && ox > -1 && ox < V_sx) {
-
-                  if (f_depth == 3) {
-                    val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
-                  }
+                  printf("depth: %d\n", f_depth);
+                  // if (f_depth == 3) {
+                  //   printf("This is at 0: %d" f_w[f_w_index]);
+                  //   printf("This is at 1: %d" f_w[f_w_index]);
+                  //   printf("This is at 2: %d" f_w[f_w_index]);
+                  //   printf("This is at 3: %d" f_w[f_w_index]);
+                  //   printf("This is at 4: %d" f_w[f_w_index]);
+                  //   val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
+                  // }
                   else if (f_depth == 16) {
                     __m256d sum = _mm256_setzero_pd();
                     V_w_sum = V_w + V_w_index;
@@ -834,35 +849,35 @@ void net_classify_cats(network_t* net, vol_t** input, double* output, int n) {
      but when i add in parallelization for some reason larger batches is slower than batch 
      size 1. I've played around with batch sizes and it is always slower...*/
 
- #pragma omp parallel
+ // #pragma omp parallel
+ //  {
+ //    batch_t* batch = make_batch(net, 20);
+ //    #pragma omp for
+ //    for (int i = 0; i < n; i+=20) {
+ //      for (int x = 0; x < 20; x++) {
+ //        copy_vol(batch[0][x], input[i+x]);     
+ //      }
+ //      net_forward(net, batch, 0, 19);
+ //      for (int z = 0; z < n; z+=20) {
+ //        output[i+z] = batch[11][z]->w[CAT_LABEL];
+ //      }
+ //    }
+
+ //    free_batch(batch, 20);
+ //  }
+
+   #pragma omp parallel
   {
-    batch_t* batch = make_batch(net, 20);
+    batch_t* batch = make_batch(net, 1);
     #pragma omp for
-    for (int i = 0; i < n; i+=20) {
-      for (int x = 0; x < 20; x++) {
-        copy_vol(batch[0][x], input[i+x]);     
-      }
-      net_forward(net, batch, 0, 19);
-      for (int z = 0; z < n; z+=20) {
-        output[i+z] = batch[11][z]->w[CAT_LABEL];
-      }
+    for (int i = 0; i < n; i+=1) {
+      copy_vol(batch[0][0], input[i]);
+      net_forward(net, batch, 0, 0);
+      output[i] = batch[11][0]->w[CAT_LABEL];
     }
 
-    free_batch(batch, 20);
+    free_batch(batch, 1);
   }
-
-  //  #pragma omp parallel
-  // {
-  //   batch_t* batch = make_batch(net, 1);
-  //   #pragma omp for
-  //   for (int i = 0; i < n; i+=1) {
-  //     copy_vol(batch[0][0], input[i]);
-  //     net_forward(net, batch, 0, 0);
-  //     output[i] = batch[11][0]->w[CAT_LABEL];
-  //   }
-
-  //   free_batch(batch, 1);
-  // }
 
 
     // batch_t* batch = make_batch(net, 1);

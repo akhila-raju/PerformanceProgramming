@@ -187,52 +187,66 @@ conv_layer_t* make_conv_layer(int in_sx, int in_sy, int in_depth,
 
 void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
 
-  int xy_stride = l->stride;
+  //int xy_stride = l->stride;
   int l_out_sy = l->out_sy;
   int l_out_sx = l->out_sx;
-  int l_pad = -l->pad;
   vol_t* l_biases = l->biases;
   int l_out_depth = l->out_depth;
-  double newsum[4];
   double* V_w_sum;
   double* f_w_sum;
   int y;
   int x;
-  for (int i = start; i <= end; i++) {
-    vol_t* V = in[i];
-    vol_t* A = out[i];
-        
-    int V_sx = V->sx;
-    int V_sy = V->sy;
-    int V_depth = V->depth;
-    double* V_w = V->w;
-  
-    for(int d = 0; d < l_out_depth; d++) {
+  vol_t* V = in[0];
+  vol_t* A = out[0];     
+  int V_sx = V->sx;
+  int V_sy = V->sy;
+  int V_depth = V->depth;
+  double* V_w = V->w;
+  int d;
+  int ay;
+  int ax;
+  int fy;
+  int fx;
+  double val;
+  int oy;
+  int V_sum;
+  int f_sum;
+  int ox;
+  int V_w_index;
+  int f_w_index;
+  int f_sx;
+  int f_sy;
+  int f_depth;
+  double* f_w;
+  double end_add;  
+
+
+    for(d = 0; d < l_out_depth; d++) {
       vol_t* f = l->filters[d];
-      y = l_pad;
-      int f_sx = f->sx;
-      int f_sy = f->sy;
-      int f_depth = f->depth;
-      double* f_w = f->w;
-      double end_add = l_biases->w[d];
+      y = -2;
+      f_sx = f->sx;
+      f_sy = f->sy;
+      f_depth = f->depth;
+      f_w = f->w;
+      end_add = l_biases->w[d];
       
-      for(int ay = 0; ay < l_out_sy; y += xy_stride, ay++) {
-        x = l_pad;
+      for(ay = 0; ay < l_out_sy; y += 1, ay++) {
+        x = -2;
         
-        for(int ax=0; ax < l_out_sx; x += xy_stride, ax++) {
-          double val = 0.0;
+        for(ax = 0; ax < l_out_sx; x += 1, ax++) {
+          val = 0.0;
 
-            for(int fy = 0; fy < f_sy; fy++) {
-              int oy = y + fy;
-              int V_sum = V_sx * oy;
-              int f_sum = f_sx * fy;
+            for(fy = 0; fy < f_sy; fy++) {
+              oy = y + fy;
+              V_sum = V_sx * oy;
+              f_sum = f_sx * fy;
 
-                for(int fx = 0; fx < f_sx; fx++) {
-                  int ox = x + fx;
-                  int V_w_index = ((V_sum)+ox)*V_depth;
-                  int f_w_index = ((f_sum)+fx)*f_depth;
+                for(fx = 0; fx < f_sx && oy > -1 && oy < V_sy; fx++) {
+                  ox = x + fx;
+                  V_w_index = ((V_sum)+ox)*V_depth;
+                  f_w_index = ((f_sum)+fx)*f_depth;
                 
-                if(oy > -1 && oy < V_sy && ox > -1 && ox < V_sx) {
+                if(ox > -1 && ox < V_sx) {
 
                   if (f_depth == 3) {
                     val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
@@ -262,8 +276,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                     f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
                     sum = _mm256_add_pd(sum, f_times_v); // add vectors
 
-                    _mm256_storeu_pd(newsum, sum);
-                    val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
+                    val += sum[0] + sum[1] + sum[2] + sum[3];
                   }
                   else if (f_depth == 20) {
                     __m256d sum = _mm256_setzero_pd();
@@ -295,8 +308,7 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                     f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
                     sum = _mm256_add_pd(sum, f_times_v); // add vectors
 
-                    _mm256_storeu_pd(newsum, sum);
-                    val += newsum[0] + newsum[1] + newsum[2] + newsum[3];
+                    val += sum[0] + sum[1] + sum[2] + sum[3];
                   }
                 }
               } 
@@ -306,7 +318,6 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
         }
       }
     }
-  }
 }
 
 void conv_load(conv_layer_t* l, const char* fn) {
