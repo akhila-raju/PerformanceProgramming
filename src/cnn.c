@@ -185,6 +185,74 @@ conv_layer_t* make_conv_layer(int in_sx, int in_sy, int in_depth,
   return l;
 }
 
+double return_val(int f_depth, double* V_w, double* f_w, int V_w_index, int f_w_index, double* V_w_sum, double* f_w_sum, double val) {
+                  if (f_depth == 3) {
+                    val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
+                  }
+                  else if (f_depth == 16) {
+                    __m256d sum = _mm256_setzero_pd();
+                    V_w_sum = V_w + V_w_index;
+                    f_w_sum = f_w + f_w_index;
+
+                    __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
+                    __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
+                    __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+4); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+4); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+8); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+8); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+12); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+12); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    val += sum[0] + sum[1] + sum[2] + sum[3];
+                  }
+                  else if (f_depth == 20) {
+                    __m256d sum = _mm256_setzero_pd();
+                    V_w_sum = V_w + V_w_index;
+                    f_w_sum = f_w + f_w_index;
+
+                    __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
+                    __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
+                    __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+4); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+4); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+8); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+8); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+12); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+12); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    v_vector = _mm256_loadu_pd(V_w_sum+16); // load v vector
+                    f_vector = _mm256_loadu_pd(f_w_sum+16); // load f vector
+                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
+                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
+
+                    val += sum[0] + sum[1] + sum[2] + sum[3];
+                  }
+
+  return val;
+}
+
+
 void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) {
 
   int l_out_sy = l->out_sy;
@@ -247,69 +315,8 @@ void conv_forward(conv_layer_t* l, vol_t** in, vol_t** out, int start, int end) 
                   if(ox > -1 && ox < V_sx) {
                   V_w_index = ((V_sum)+ox)*V_depth;
                   f_w_index = ((f_sum)+fx)*f_depth;
+                  val = return_val(f_depth, V_w, f_w, V_w_index, f_w_index, V_w_sum, f_w_sum, val); // SIMD
 
-                  if (f_depth == 3) {
-                    val += f_w[f_w_index] * V_w[V_w_index] + f_w[f_w_index+1] * V_w[V_w_index+1] + f_w[f_w_index+2] * V_w[V_w_index+2];
-                  }
-                  else if (f_depth == 16) {
-                    __m256d sum = _mm256_setzero_pd();
-                    V_w_sum = V_w + V_w_index;
-                    f_w_sum = f_w + f_w_index;
-
-                    __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
-                    __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
-                    __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    v_vector = _mm256_loadu_pd(V_w_sum+4); // load v vector
-                    f_vector = _mm256_loadu_pd(f_w_sum+4); // load f vector
-                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    v_vector = _mm256_loadu_pd(V_w_sum+8); // load v vector
-                    f_vector = _mm256_loadu_pd(f_w_sum+8); // load f vector
-                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    v_vector = _mm256_loadu_pd(V_w_sum+12); // load v vector
-                    f_vector = _mm256_loadu_pd(f_w_sum+12); // load f vector
-                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    val += sum[0] + sum[1] + sum[2] + sum[3];
-                  }
-                  else {
-                    __m256d sum = _mm256_setzero_pd();
-                    V_w_sum = V_w + V_w_index;
-                    f_w_sum = f_w + f_w_index;
-
-                    __m256d v_vector = _mm256_loadu_pd(V_w_sum); // load v vector
-                    __m256d f_vector = _mm256_loadu_pd(f_w_sum); // load f vector
-                    __m256d f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    v_vector = _mm256_loadu_pd(V_w_sum+4); // load v vector
-                    f_vector = _mm256_loadu_pd(f_w_sum+4); // load f vector
-                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    v_vector = _mm256_loadu_pd(V_w_sum+8); // load v vector
-                    f_vector = _mm256_loadu_pd(f_w_sum+8); // load f vector
-                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    v_vector = _mm256_loadu_pd(V_w_sum+12); // load v vector
-                    f_vector = _mm256_loadu_pd(f_w_sum+12); // load f vector
-                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    v_vector = _mm256_loadu_pd(V_w_sum+16); // load v vector
-                    f_vector = _mm256_loadu_pd(f_w_sum+16); // load f vector
-                    f_times_v = _mm256_mul_pd(f_vector, v_vector); // multiply f vector and v vector
-                    sum = _mm256_add_pd(sum, f_times_v); // add vectors
-
-                    val += sum[0] + sum[1] + sum[2] + sum[3];
-                  }
                 }
               }
               } 
